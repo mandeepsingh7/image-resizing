@@ -230,7 +230,7 @@ int main() {
 	//-----------------------------------
 	// Step 2 
 	//-----------------------------------
-	int iteration_count = 100;
+	int iteration_count = 1000;
 	std::vector<float> built_in_times;
 
 	// Nearest Neighbours Interpolation
