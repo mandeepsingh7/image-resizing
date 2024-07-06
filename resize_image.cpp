@@ -46,12 +46,8 @@ float isConsistent(cv::Mat& img_1, cv::Mat& img_2, int tol) {
 
 // Function for BiLinear Interpolation 
 cv::Vec3b BiLinear(cv::Mat& src, float x, float y) {
-	if (x < 0.0) {
-		x = 0.0;
-	}
-	if (y < 0.0) {
-		y = 0.0;
-	}
+	x = std::max(0.0f, x);
+	y = std::max(0.0f, y);
 
 	int x1 = static_cast<int>(x);
 	int y1 = static_cast<int>(y);
@@ -69,9 +65,9 @@ cv::Vec3b BiLinear(cv::Mat& src, float x, float y) {
 	cv::Vec3b intensity_new;
 
 	for (int i = 0; i < 3; i++) {
-		intensity_new[i] = intensity_1[i] * (1 - xAlpha) * (1 - yAlpha) +
-					intensity_2[i] * xAlpha * (1 - yAlpha) +
-					intensity_3[i] * (1 - xAlpha) * yAlpha +
+		intensity_new[i] = intensity_1[i] * (1.0f - xAlpha) * (1.0f - yAlpha) +
+					intensity_2[i] * xAlpha * (1.0f - yAlpha) +
+					intensity_3[i] * (1.0f - xAlpha) * yAlpha +
 					intensity_4[i] * xAlpha * yAlpha;
 	}
 
@@ -80,10 +76,14 @@ cv::Vec3b BiLinear(cv::Mat& src, float x, float y) {
 
 // Function for Cubic Interpolation in 1D
 float Spline_Interpolate(float i1, float i2, float i3, float i4, float alpha) {
-	return ((-i1 + 3 * i2 - 3 * i3 + i4) * pow(alpha, 3) / 6) +
-		((i1 - 2 * i2 + i3) * pow(alpha, 2) / 2) +
-		((-2 * i1 - 3 * i2 + 6 * i3 - i4) * alpha / 6) +
-		i2;
+	float alpha2 = alpha * alpha;
+	float alpha3 = alpha2 * alpha;
+	
+	const float c1 = (-i1 + 3.0f * i2 - 3.0f * i3 + i4) / 6.0f;
+	const float c2 = (i1 - 2.0f * i2 + i3) / 2.0f;
+	const float c3 = (-2.0f * i1 - 3.0f * i2 + 6.0f * i3 - i4) / 6.0f;
+
+	return c1 * alpha3 + c2 * alpha2 + c3 * alpha + i2;
 }
 
 // Function for BiCubic Interpolation
@@ -140,16 +140,11 @@ cv::Vec3b BiCubic(cv::Mat& src, float x, float y) {
 		);
 		//cout << "Color Channel = " << i << endl;
 		//cout << "(i0, i1, i2, i3) = (" << intensity_0 << ", " << intensity_1 << ", " << intensity_2 << ", " << intensity_3 << ")." << endl;
+		
+
+
 		float final_intensity = Spline_Interpolate(intensity_0, intensity_1, intensity_2, intensity_3, alphaY);
-		if (final_intensity < 0.0) {
-			intensity_new[i] = 0.0;
-		}
-		else if (final_intensity > 255.0) {
-			intensity_new[i] = 255.0;
-		}
-		else {
-			intensity_new[i] = final_intensity;
-		}
+		intensity_new[i] = static_cast<uchar>(std::max(0.0f, std::min(255.0f, final_intensity)));
 
 		//cout << "Final Spline = " << final_intensity << endl;;
 		//cout << "Final Intensity = " << static_cast<int>(intensity_new[i]) << endl;;
@@ -172,18 +167,30 @@ void custom_resize(cv::Mat& src, cv::Mat& dst, cv::Size dsize, double fx = 0.0, 
 	float scaling_factor_x = ((static_cast<float>(src.cols)) / (dsize.width));
 	float scaling_factor_y = ((static_cast<float>(src.rows)) / (dsize.height));
 
+	std::vector<float> x_src_components(dsize.width);
+	std::vector<float> y_src_components(dsize.height);
+
+	for (int x = 0; x < dsize.width; x++) {
+		x_src_components[x] = (x + 0.5f) * scaling_factor_x - 0.5f;
+	}
 
 	for (int y = 0; y < dsize.height; y++) {
-		for (int x = 0; x < dsize.width; x++) {
-			float x_src = (x+0.5) * scaling_factor_x - 0.5;
-			float y_src = (y+0.5) * scaling_factor_y - 0.5;
+		y_src_components[y] = (y + 0.5f) * scaling_factor_y - 0.5f;
+	}
 
+	for (int y = 0; y < dsize.height; y++) {
+		float y_src = y_src_components[y];
+		//float y_src = (y + 0.5f) * scaling_factor_y - 0.5f;
+		int y_src_int = static_cast<int>(std::floor(0.49999f + y_src));
+		for (int x = 0; x < dsize.width; x++) {
+			float x_src = x_src_components[x];
+			//float x_src = (x+0.5f) * scaling_factor_x - 0.5f;
 			//cout << "For (x, y) = (" << x << ", " << y << "), (x_src, y_src) = (" << x_src << ", " << y_src << "), Int Value = (" << static_cast<int>(floor(0.49999 + x_src)) << "," << static_cast<int>(floor(0.49999 + y_src)) << ")" << endl;
 			//cout << "-------------------------------------------" << endl; 
 
 
 			if (interpolation == INTER_NEAREST_CUSTOM) {
-				dst.at<cv::Vec3b>(y, x) = src.at<cv::Vec3b>(static_cast<int>(floor(0.49999 + y_src)), static_cast<int>(floor(0.49999 + x_src)));
+				dst.at<cv::Vec3b>(y, x) = src.at<cv::Vec3b>(y_src_int, static_cast<int>(floor(0.49999 + x_src)));
 			}
 			else if (interpolation == INTER_LINEAR_CUSTOM) {
 				dst.at<cv::Vec3b>(y, x) = BiLinear(src, x_src, y_src);
@@ -223,7 +230,7 @@ int main() {
 	//-----------------------------------
 	// Step 2 
 	//-----------------------------------
-	int iteration_count = 1000;
+	int iteration_count = 100;
 	std::vector<float> built_in_times;
 
 	// Nearest Neighbours Interpolation
