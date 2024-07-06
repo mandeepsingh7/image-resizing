@@ -1,14 +1,17 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
 #include <iostream>
+#include <iomanip>
 #include <chrono>
 #include <cmath>
 
-using namespace cv;
-using namespace std;
-using namespace std::chrono;
+//using namespace cv;
+//using namespace std;
+//using namespace std::chrono;
 
+// Enumeration of the interpolation method
 enum InterpolationFlags {
 	INTER_NEAREST_CUSTOM = 0,
 	INTER_LINEAR_CUSTOM = 1,
@@ -18,18 +21,18 @@ enum InterpolationFlags {
 // Function to check consistency between 2 images 
 // This function returns the percentage of pixels for which the difference in the intensity values of 2 images is less than a given tolerance tol.
 // If tol == 0, then it will return the percentage of pixels with exact match between 2 images.
-float isConsistent(Mat& img_1, Mat& img_2, int tol) {
+float isConsistent(cv::Mat& img_1, cv::Mat& img_2, int tol) {
 	if (img_1.size() != img_2.size()) {
 		return false;
 	}
-	Mat diff;
-	absdiff(img_1, img_2, diff);
+	cv::Mat diff;
+	cv::absdiff(img_1, img_2, diff);
 
 	int count = 0;
 
 	for (int y = 0; y < img_1.rows; y++) {
 		for (int x = 0; x < img_1.cols; x++) {
-			Vec3b pixels = diff.at<Vec3b>(y, x);
+			cv::Vec3b pixels = diff.at<cv::Vec3b>(y, x);
 			for (int i = 0; i < 3; i++) {
 				if (static_cast<int>(pixels[i]) > tol) {
 					count++;
@@ -42,7 +45,7 @@ float isConsistent(Mat& img_1, Mat& img_2, int tol) {
 }
 
 // Function for BiLinear Interpolation 
-Vec3b BiLinear(Mat& src, float x, float y) {
+cv::Vec3b BiLinear(cv::Mat& src, float x, float y) {
 	if (x < 0.0) {
 		x = 0.0;
 	}
@@ -52,18 +55,18 @@ Vec3b BiLinear(Mat& src, float x, float y) {
 
 	int x1 = static_cast<int>(x);
 	int y1 = static_cast<int>(y);
-	int x2 = min(x1 + 1, src.cols - 1);
-	int y2 = min(y1 + 1, src.rows - 1);
+	int x2 = std::min(x1 + 1, src.cols - 1);
+	int y2 = std::min(y1 + 1, src.rows - 1);
 
-	Vec3b intensity_1 = src.at<Vec3b>(y1, x1);
-	Vec3b intensity_2 = src.at<Vec3b>(y1, x2);
-	Vec3b intensity_3 = src.at<Vec3b>(y2, x1);
-	Vec3b intensity_4 = src.at<Vec3b>(y2, x2);
+	cv::Vec3b intensity_1 = src.at<cv::Vec3b>(y1, x1);
+	cv::Vec3b intensity_2 = src.at<cv::Vec3b>(y1, x2);
+	cv::Vec3b intensity_3 = src.at<cv::Vec3b>(y2, x1);
+	cv::Vec3b intensity_4 = src.at<cv::Vec3b>(y2, x2);
 
 	float xAlpha = x - x1;
 	float yAlpha = y - y1; 
 
-	Vec3b intensity_new;
+	cv::Vec3b intensity_new;
 
 	for (int i = 0; i < 3; i++) {
 		intensity_new[i] = intensity_1[i] * (1 - xAlpha) * (1 - yAlpha) +
@@ -75,7 +78,7 @@ Vec3b BiLinear(Mat& src, float x, float y) {
 	return intensity_new;
 }
 
-// Cubic Interpolation (1D)
+// Function for Cubic Interpolation in 1D
 float Spline_Interpolate(float i1, float i2, float i3, float i4, float alpha) {
 	return ((-i1 + 3 * i2 - 3 * i3 + i4) * pow(alpha, 3) / 6) +
 		((i1 - 2 * i2 + i3) * pow(alpha, 2) / 2) +
@@ -83,18 +86,18 @@ float Spline_Interpolate(float i1, float i2, float i3, float i4, float alpha) {
 		i2;
 }
 
-// BiCubic Interpolation (2D)
-Vec3b BiCubic(Mat& src, float x, float y) {
+// Function for BiCubic Interpolation
+cv::Vec3b BiCubic(cv::Mat& src, float x, float y) {
 	
 	int x1 = static_cast<int>(x);
 	int y1 = static_cast<int>(y);
 
-	int x0 = max(x1 - 1, 0);
-	int x2 = min(x1 + 1, src.cols - 1);
-	int x3 = min(x1 + 2, src.cols - 1);
-	int y0 = max(y1 - 1, 0);
-	int y2 = min(y1 + 1, src.rows - 1);
-	int y3 = min(y1 + 2, src.rows - 1);
+	int x0 = std::max(x1 - 1, 0);
+	int x2 = std::min(x1 + 1, src.cols - 1);
+	int x3 = std::min(x1 + 2, src.cols - 1);
+	int y0 = std::max(y1 - 1, 0);
+	int y2 = std::min(y1 + 1, src.rows - 1);
+	int y3 = std::min(y1 + 2, src.rows - 1);
 
 	//cout << "(x_src, y_src) = (" << x << "," << y << ")." << endl;
 	//cout << "(x0, x1, x2, x3) = (" << x0 << ", " << x1 << ", " << x2 << ", " << x3 << ")." << endl;
@@ -102,37 +105,37 @@ Vec3b BiCubic(Mat& src, float x, float y) {
 
 	float alphaX = x - x1;
 	float alphaY = y - y1; 
-	Vec3b intensity_new;
+	cv::Vec3b intensity_new;
 	for (int i = 0; i < 3; i++) {
 		float intensity_0 = Spline_Interpolate(
-			src.at<Vec3b>(y0, x0)[i],
-			src.at<Vec3b>(y0, x1)[i],
-			src.at<Vec3b>(y0, x2)[i],
-			src.at<Vec3b>(y0, x2)[i],
+			src.at<cv::Vec3b>(y0, x0)[i],
+			src.at<cv::Vec3b>(y0, x1)[i],
+			src.at<cv::Vec3b>(y0, x2)[i],
+			src.at<cv::Vec3b>(y0, x2)[i],
 			alphaX
 		);
 
 		float intensity_1 = Spline_Interpolate(
-			src.at<Vec3b>(y1, x0)[i],
-			src.at<Vec3b>(y1, x1)[i],
-			src.at<Vec3b>(y1, x2)[i],
-			src.at<Vec3b>(y1, x2)[i],
+			src.at<cv::Vec3b>(y1, x0)[i],
+			src.at<cv::Vec3b>(y1, x1)[i],
+			src.at<cv::Vec3b>(y1, x2)[i],
+			src.at<cv::Vec3b>(y1, x2)[i],
 			alphaX
 		);
 
 		float intensity_2 = Spline_Interpolate(
-			src.at<Vec3b>(y2, x0)[i],
-			src.at<Vec3b>(y2, x1)[i],
-			src.at<Vec3b>(y2, x2)[i],
-			src.at<Vec3b>(y2, x2)[i],
+			src.at<cv::Vec3b>(y2, x0)[i],
+			src.at<cv::Vec3b>(y2, x1)[i],
+			src.at<cv::Vec3b>(y2, x2)[i],
+			src.at<cv::Vec3b>(y2, x2)[i],
 			alphaX
 		);
 
 		float intensity_3 = Spline_Interpolate(
-			src.at<Vec3b>(y3, x0)[i],
-			src.at<Vec3b>(y3, x1)[i],
-			src.at<Vec3b>(y3, x2)[i],
-			src.at<Vec3b>(y3, x2)[i],
+			src.at<cv::Vec3b>(y3, x0)[i],
+			src.at<cv::Vec3b>(y3, x1)[i],
+			src.at<cv::Vec3b>(y3, x2)[i],
+			src.at<cv::Vec3b>(y3, x2)[i],
 			alphaX
 		);
 		//cout << "Color Channel = " << i << endl;
@@ -155,10 +158,11 @@ Vec3b BiCubic(Mat& src, float x, float y) {
 	return intensity_new;
 }
 
-void custom_resize(Mat& src, Mat& dst, Size dsize, double fx = 0.0, double fy = 0.0, int interpolation = INTER_NEAREST_CUSTOM) {
+// Custom Resize Function with different Interpolation Methods 
+void custom_resize(cv::Mat& src, cv::Mat& dst, cv::Size dsize, double fx = 0.0, double fy = 0.0, int interpolation = INTER_NEAREST_CUSTOM) {
 
-	if (dsize == Size()) {
-		dsize = Size(saturate_cast<int>(fx * src.cols), saturate_cast<int>(fy * src.rows));
+	if (dsize == cv::Size()) {
+		dsize = cv::Size(cv::saturate_cast<int>(fx * src.cols), cv::saturate_cast<int>(fy * src.rows));
 	}
 
 	if (dsize != dst.size()) {
@@ -167,6 +171,7 @@ void custom_resize(Mat& src, Mat& dst, Size dsize, double fx = 0.0, double fy = 
 
 	float scaling_factor_x = ((static_cast<float>(src.cols)) / (dsize.width));
 	float scaling_factor_y = ((static_cast<float>(src.rows)) / (dsize.height));
+
 
 	for (int y = 0; y < dsize.height; y++) {
 		for (int x = 0; x < dsize.width; x++) {
@@ -178,13 +183,13 @@ void custom_resize(Mat& src, Mat& dst, Size dsize, double fx = 0.0, double fy = 
 
 
 			if (interpolation == INTER_NEAREST_CUSTOM) {
-				dst.at<Vec3b>(y, x) = src.at<Vec3b>(static_cast<int>(floor(0.49999 + y_src)), static_cast<int>(floor(0.49999 + x_src)));
+				dst.at<cv::Vec3b>(y, x) = src.at<cv::Vec3b>(static_cast<int>(floor(0.49999 + y_src)), static_cast<int>(floor(0.49999 + x_src)));
 			}
 			else if (interpolation == INTER_LINEAR_CUSTOM) {
-				dst.at<Vec3b>(y, x) = BiLinear(src, x_src, y_src);
+				dst.at<cv::Vec3b>(y, x) = BiLinear(src, x_src, y_src);
 			}
 			else if (interpolation == INTER_CUBIC_CUSTOM) {
-				dst.at<Vec3b>(y, x) = BiCubic(src, x_src, y_src);
+				dst.at<cv::Vec3b>(y, x) = BiCubic(src, x_src, y_src);
 			}
 		}
 	}
@@ -192,138 +197,141 @@ void custom_resize(Mat& src, Mat& dst, Size dsize, double fx = 0.0, double fy = 
 
 
 int main() {
-	string image_path = samples::findFile("G178_2 -1080.BMP");
-	Mat img = imread(image_path);
-	cout << "Size of Original Image = " << img.size() << endl;
+	std::string image_path = cv::samples::findFile("G178_2 -1080.BMP");
+	cv::Mat img = cv::imread(image_path);
+	std::cout << "Size of Original Image = " << img.size() << std::endl;
 	int height = img.rows;
 	int width = img.cols;
-	Size new_size(width / 2, height / 2);
-	cout << "Size of Resized Image = " << new_size << endl;
-	cout << endl;
+	cv::Size new_size(width / 2, height / 2);
+	std::cout << "Size of Resized Image = " << new_size << std::endl;
+	std::cout << std::endl;
 	//-----------------------------------
 	// Step 1
 	//-----------------------------------
 
-	Mat resize_nearest, resize_linear, resize_cubic;
-	resize(img, resize_nearest, new_size, 0, 0, INTER_NEAREST);
-	imwrite("Resize_Nearest_OpenCV.bmp", resize_nearest);
-	resize(img, resize_linear, new_size, 0, 0, INTER_LINEAR);
-	imwrite("Resize_Linear_OpenCV.bmp", resize_linear);
-	resize(img, resize_cubic, new_size, 0, 0, INTER_CUBIC);
-	imwrite("Resize_Cubic_OpenCV.bmp", resize_cubic);
+	cv::Mat resize_nearest, resize_linear, resize_cubic;
+	cv::resize(img, resize_nearest, new_size, 0, 0, cv::INTER_NEAREST);
+	cv::imwrite("Resize_Nearest_OpenCV.bmp", resize_nearest);
+	cv::resize(img, resize_linear, new_size, 0, 0, cv::INTER_LINEAR);
+	cv::imwrite("Resize_Linear_OpenCV.bmp", resize_linear);
+	cv::resize(img, resize_cubic, new_size, 0, 0, cv::INTER_CUBIC);
+	cv::imwrite("Resize_Cubic_OpenCV.bmp", resize_cubic);
 	//resize(img, resize_cubic_new, Size(), 0.5, 0.5, INTER_CUBIC);
 
-	cout << "-------------------------------------------------------------------------------------------" << endl;
+	std::cout << "-------------------------------------------------------------------------------------------" << std::endl;
 
 	//-----------------------------------
 	// Step 2 
 	//-----------------------------------
 	int iteration_count = 10;
-	vector<float> built_in_times;
+	std::vector<float> built_in_times;
 
 	// Nearest Neighbours Interpolation
-	auto start = high_resolution_clock::now();
+	auto start = std::chrono::high_resolution_clock::now();
 	for (int i = 0; i < iteration_count; i++) {
-		resize(img, resize_nearest, new_size, 0, 0, INTER_NEAREST);
+		cv::resize(img, resize_nearest, new_size, 0, 0, cv::INTER_NEAREST);
 	}
-	auto stop = high_resolution_clock::now();
-	auto duration = duration_cast<milliseconds>(stop - start).count();
+	auto stop = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
 	built_in_times.push_back(duration);
-	cout << "Time taken for " << iteration_count << " iterations using built-in resize function (INTER_NEAREST) = " << duration << " ms." << endl;
+	std::cout << "Time taken for " << iteration_count << " iterations using built-in resize function (INTER_NEAREST) = " << duration << " ms." << std::endl;
 
 	// BiLinear Interpolation
-	start = high_resolution_clock::now();
+	start = std::chrono::high_resolution_clock::now();
 	for (int i = 0; i < iteration_count; i++) {
-		resize(img, resize_linear, new_size, 0, 0, INTER_LINEAR);
+		cv::resize(img, resize_linear, new_size, 0, 0, cv::INTER_LINEAR);
 	}
-	stop = high_resolution_clock::now();
-	duration = duration_cast<milliseconds>(stop - start).count();
+	stop = std::chrono::high_resolution_clock::now();
+	duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
 	built_in_times.push_back(duration);
-	cout << "Time taken for " << iteration_count << " iterations using built-in resize function (INTER_LINEAR) = " << duration << " ms." << endl;
+	std::cout << "Time taken for " << iteration_count << " iterations using built-in resize function (INTER_LINEAR) = " << duration << " ms." << std::endl;
 
 	// BiCubic Interpolation
-	start = high_resolution_clock::now();
+	start = std::chrono::high_resolution_clock::now();
 	for (int i = 0; i < iteration_count; i++) {
-		resize(img, resize_cubic, new_size, 0, 0, INTER_CUBIC);
+		cv::resize(img, resize_cubic, new_size, 0, 0, cv::INTER_CUBIC);
 	}
-	stop = high_resolution_clock::now();
-	duration = duration_cast<milliseconds>(stop - start).count();
+	stop = std::chrono::high_resolution_clock::now();
+	duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
 	built_in_times.push_back(duration);
-	cout << "Time taken for " << iteration_count << " iterations using built-in resize function (INTER_CUBIC) = " << duration << " ms." << endl;
-	cout << "-------------------------------------------------------------------------------------------" << endl;
-	cout << endl;
+	std::cout << "Time taken for " << iteration_count << " iterations using built-in resize function (INTER_CUBIC) = " << duration << " ms." << std::endl;
+	std::cout << "-------------------------------------------------------------------------------------------" << std::endl;
+	std::cout << std::endl;
 
 	//-----------------------------------
 	// Step 3
 	//-----------------------------------
 
-	Mat resize_nearest_custom, resize_linear_custom, resize_cubic_custom;
+	cv::Mat resize_nearest_custom, resize_linear_custom, resize_cubic_custom;
 	custom_resize(img, resize_nearest_custom, new_size, 0, 0, INTER_NEAREST_CUSTOM);
+	cv::imwrite("Resize_Nearest_Custom.bmp", resize_nearest_custom);
 	custom_resize(img, resize_linear_custom, new_size, 0, 0, INTER_LINEAR_CUSTOM);
+	cv::imwrite("Resize_Linear_Custom.bmp", resize_linear_custom);
 	custom_resize(img, resize_cubic_custom, new_size, 0, 0, INTER_CUBIC_CUSTOM);
-	cout << "Consistency of custom resize function (INTER_NEAREST) (tolerance = 0) = " << isConsistent(resize_nearest, resize_nearest_custom, 0) << "%." << endl;
-	cout << "-----------------------------------------------------------------------------" << endl;
-	cout << endl; 
-	cout << "----------------------------------------------------------------------------------------------------------------------" << endl;
-	cout << "Tolerance is the maximum difference between pixel intensity of the image generated from custom and built-in functions." << endl;
-	cout << "----------------------------------------------------------------------------------------------------------------------" << endl;
-	cout << endl ;
-	cout << "Consistency of custom resize function (INTER_LINEAR):" << endl;
-	cout << "-----------------------------------------------------" << endl;
+	cv::imwrite("Resize_Cubic_Custom.bmp", resize_cubic_custom);
+	std::cout << "Consistency of custom resize function (INTER_NEAREST) (tolerance = 0) = " << isConsistent(resize_nearest, resize_nearest_custom, 0) << "%." << std::endl;
+	std::cout << "-----------------------------------------------------------------------------" << std::endl;
+	std::cout << std::endl; 
+	std::cout << "----------------------------------------------------------------------------------------------------------------------" << std::endl;
+	std::cout << "Tolerance is the maximum difference between pixel intensity of the image generated from custom and built-in functions." << std::endl;
+	std::cout << "----------------------------------------------------------------------------------------------------------------------" << std::endl;
+	std::cout << std::endl ;
+	std::cout << "Consistency of custom resize function (INTER_LINEAR):" << std::endl;
+	std::cout << "-----------------------------------------------------" << std::endl;
 	for (int i = 0; i < 6; i++) {
-		cout << "Consistency (tolerance = " << i << ") = " << fixed << setprecision(2) << isConsistent(resize_linear, resize_linear_custom, i) << "%." << endl;
+		std::cout << "Consistency (tolerance = " << i << ") = " << std::fixed << std::setprecision(2) << isConsistent(resize_linear, resize_linear_custom, i) << "%." << std::endl;
 	}
-	cout << endl;
-	cout << "Consistency of custom resize function (INTER_CUBIC):" << endl;
-	cout << "----------------------------------------------------" << endl;
+	std::cout << std::endl;
+	std::cout << "Consistency of custom resize function (INTER_CUBIC):" << std::endl;
+	std::cout << "----------------------------------------------------" << std::endl;
 	for (int i = 0; i < 31; i = i + 5) {
-		cout << "Consistency (tolerance = " << i << ") = " << fixed << setprecision(2) << isConsistent(resize_cubic, resize_cubic_custom, i) << "%." << endl;
+		std::cout << "Consistency (tolerance = " << i << ") = " << std::fixed << std::setprecision(2) << isConsistent(resize_cubic, resize_cubic_custom, i) << "%." << std::endl;
 	}
-	cout << endl;
-	cout << "-----------------------------------------------------------------------------------------" << endl;
-	vector<float> custom_times;
+	std::cout << std::endl;
+	std::cout << "-----------------------------------------------------------------------------------------" << std::endl;
+	std::vector<float> custom_times;
 
 	// Nearest Neighbours Interpolation with Custom Function 
-	start = high_resolution_clock::now();
+	start = std::chrono::high_resolution_clock::now();
 	for (int i = 0; i < iteration_count; i++) {
 		custom_resize(img, resize_nearest_custom, new_size, 0, 0, INTER_NEAREST_CUSTOM);
 	}
-	stop = high_resolution_clock::now();
-	duration = duration_cast<milliseconds>(stop - start).count();
+	stop = std::chrono::high_resolution_clock::now();
+	duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
 	custom_times.push_back(duration);
-	cout << "Time taken for " << iteration_count << " iterations using custom resize function (INTER_NEAREST_CUSTOM) = " << duration << " ms." << endl;
+	std::cout << "Time taken for " << iteration_count << " iterations using custom resize function (INTER_NEAREST_CUSTOM) = " << duration << " ms." << std::endl;
 
 	// BiLinear Interpolation with Custom Function 
-	start = high_resolution_clock::now();
+	start = std::chrono::high_resolution_clock::now();
 	for (int i = 0; i < iteration_count; i++) {
 		custom_resize(img, resize_linear_custom, new_size, 0, 0, INTER_LINEAR_CUSTOM);
 	}
-	stop = high_resolution_clock::now();
-	duration = duration_cast<milliseconds>(stop - start).count();
+	stop = std::chrono::high_resolution_clock::now();
+	duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
 	custom_times.push_back(duration);
-	cout << "Time taken for " << iteration_count << " iterations using custom resize function (INTER_LINEAR_CUSTOM) = " << duration << " ms." << endl;
+	std::cout << "Time taken for " << iteration_count << " iterations using custom resize function (INTER_LINEAR_CUSTOM) = " << duration << " ms." << std::endl;
 
 	// BiCubic Interpolation with Custom Function 
-	start = high_resolution_clock::now();
+	start = std::chrono::high_resolution_clock::now();
 	for (int i = 0; i < iteration_count; i++) {
 		custom_resize(img, resize_cubic_custom, new_size, 0, 0, INTER_CUBIC_CUSTOM);
 	}
-	stop = high_resolution_clock::now();
-	duration = duration_cast<milliseconds>(stop - start).count();
+	stop = std::chrono::high_resolution_clock::now();
+	duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
 	custom_times.push_back(duration);
-	cout << "Time taken for " << iteration_count << " iterations using custom resize function (INTER_CUBIC_CUSTOM) = " << duration << " ms." << endl;
-	cout << "-----------------------------------------------------------------------------------------" << endl;
-	cout << endl; 
+	std::cout << "Time taken for " << iteration_count << " iterations using custom resize function (INTER_CUBIC_CUSTOM) = " << duration << " ms." << std::endl;
+	std::cout << "-----------------------------------------------------------------------------------------" << std::endl;
+	std::cout << std::endl; 
 
-	vector<string> interpolation_methods = { "INTER_NEAREST", "INTER_LINEAR", "INTER_CUBIC" };
+	std::vector<std::string> interpolation_methods = { "INTER_NEAREST", "INTER_LINEAR", "INTER_CUBIC" };
 
-	cout << "Comparing time taken by built-in and custom function for " << iteration_count << " iterations:" << endl;
+	std::cout << "Comparing time taken by built-in and custom function for " << iteration_count << " iterations:" << std::endl;
 
-	cout << setw(20) << "--------------------" << setw(20) << "------------------" << setw(20) << "----------------" << endl;
-	cout << setw(20) << "Interpolation Method" << setw(20) << "Built-In Times(ms)" << setw(20) << "Custom Times(ms)" << endl;
-	cout << setw(20) << "--------------------" << setw(20) << "------------------" << setw(20) << "----------------" << endl;
+	std::cout << std::setw(20) << "--------------------" << std::setw(20) << "------------------" << std::setw(20) << "----------------" << std::endl;
+	std::cout << std::setw(20) << "Interpolation Method" << std::setw(20) << "Built-In Times(ms)" << std::setw(20) << "Custom Times(ms)" << std::endl;
+	std::cout << std::setw(20) << "--------------------" << std::setw(20) << "------------------" << std::setw(20) << "----------------" << std::endl;
 	for (int i = 0; i < 3; i++) {
-		cout << setw(20) << interpolation_methods[i] << setw(20) << built_in_times[i] << setw(20) << custom_times[i] << endl;
+		std::cout << std::setw(20) << interpolation_methods[i] << std::setw(20) << built_in_times[i] << std::setw(20) << custom_times[i] << std::endl;
 	}
 	return 0;
 }
