@@ -10,7 +10,7 @@
 - C++17 or later
 - CMake (version 3.10 or later)
 
-## Installation for Linux
+## Steps
 
 1. **Install OpenCV:**
       ```bash
