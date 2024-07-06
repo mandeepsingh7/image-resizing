@@ -13,6 +13,9 @@ enum InterpolationFlags {
 	INTER_CUBIC_CUSTOM = 2,
 };
 
+// Function to check consistency between 2 images 
+// This function returns the percentage of pixels for which the difference in the intensity values of 2 images is less than a given tolerance tol.
+// If tol == 0, then it will return the percentage of pixels with exact match between 2 images.
 float isConsistent(Mat& img_1, Mat& img_2, int tol) {
 	if (img_1.size() != img_2.size()) {
 		return false;
@@ -36,6 +39,7 @@ float isConsistent(Mat& img_1, Mat& img_2, int tol) {
 	return (100 - (consistency * 100));
 }
 
+// Function for BiLinear Interpolation 
 Vec3b BiLinear(Mat& src, float x, float y) {
 	if (x < 0.0) {
 		x = 0.0;
@@ -69,7 +73,7 @@ Vec3b BiLinear(Mat& src, float x, float y) {
 	return intensity_new;
 }
 
-
+// Cubic Interpolation (1D)
 float Spline_Interpolate(float i1, float i2, float i3, float i4, float alpha) {
 	return ((-i1 + 3 * i2 - 3 * i3 + i4) * pow(alpha, 3) / 6) +
 		((i1 - 2 * i2 + i3) * pow(alpha, 2) / 2) +
@@ -77,6 +81,7 @@ float Spline_Interpolate(float i1, float i2, float i3, float i4, float alpha) {
 		i2;
 }
 
+// BiCubic Interpolation (2D)
 Vec3b BiCubic(Mat& src, float x, float y) {
 	
 	int x1 = static_cast<int>(x);
@@ -184,7 +189,7 @@ void custom_resize(Mat& src, Mat& dst, Size dsize, double fx = 0.0, double fy = 
 }
 
 
-void main() {
+int main() {
 	string path = "G178_2 -1080.BMP";
 	Mat img = imread(path);
 	cout << "Size of Original Image = " << img.size() << endl;
@@ -318,4 +323,5 @@ void main() {
 	for (int i = 0; i < 3; i++) {
 		cout << setw(20) << interpolation_methods[i] << setw(20) << built_in_times[i] << setw(20) << custom_times[i] << endl;
 	}
+	return 0;
 }
