@@ -27,7 +27,7 @@
 
 4. **Clone the repository:** 
       ```bash
-    git clone git clone https://github.com/mandeepsingh7/image-resizing.git
+    git clone https://github.com/mandeepsingh7/image-resizing.git
     cd image-resizing
 
 5. **Build the application:**
