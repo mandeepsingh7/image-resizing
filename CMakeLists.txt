@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Set the project name
-project(CustomImageResizing)
+project(Image_Resizing)
 
 # Find OpenCV package
 find_package(OpenCV REQUIRED)
@@ -10,7 +10,7 @@ find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
 # Add the source file
-add_executable(custom_image_resizing resize.cpp)
+add_executable(image_resizing resize_image.cpp)
 
 # Link OpenCV libraries
-target_link_libraries(custom_image_resizing ${OpenCV_LIBS})
+target_link_libraries(image_resizing ${OpenCV_LIBS})
