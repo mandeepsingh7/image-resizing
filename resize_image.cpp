@@ -1,4 +1,6 @@
-#include <opencv2/opencv.hpp>
+#include <opencv2/core.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/highgui.hpp>
 #include <iostream>
 #include <chrono>
 #include <cmath>
@@ -190,8 +192,8 @@ void custom_resize(Mat& src, Mat& dst, Size dsize, double fx = 0.0, double fy = 
 
 
 int main() {
-	string path = "G178_2 -1080.BMP";
-	Mat img = imread(path);
+	string image_path = samples::findFile("G178_2 -1080.BMP");
+	Mat img = imread(image_path);
 	cout << "Size of Original Image = " << img.size() << endl;
 	int height = img.rows;
 	int width = img.cols;
