@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+
+# Ignore CMake files
+CMakeFiles
+CMakeCache.txt
+cmake_install.cmake
+Makefile
